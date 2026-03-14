@@ -2,6 +2,7 @@
 
 return {
   -- Catppuccin Macchiato colorscheme (priority 1000, lazy=false for early load)
+  -- lualine integration must be enabled so lualine finds theme "catppuccin"
   {
     "catppuccin/nvim",
     name = "catppuccin-macchiato",
@@ -13,6 +14,7 @@ return {
         bufferline = true,
         cmp = true,
         gitsigns = true,
+        lualine = true,
         nvimtree = true,
         treesitter = true,
         telescope = { enabled = true },
@@ -70,7 +72,7 @@ return {
 
       return {
         options = {
-          theme = "catppuccin",
+          theme = "catppuccin-macchiato",
           component_separators = { left = "|", right = "|" },
           section_separators = { left = "", right = "" },
           globalstatus = true,

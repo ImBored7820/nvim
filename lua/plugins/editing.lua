@@ -107,9 +107,10 @@ return {
   },
 
   -- Smart bullets: hierarchy I. A. i. a. 1. (use C-t/C-d or >>/<< for demote/promote)
+  -- ft trigger loads only for .md, .txt, gitcommit (autocmds set filetype for *.txt)
   {
     "dkarter/bullets.vim",
-    ft = { "markdown", "text", "gitcommit" },
+    ft = { "markdown", "text" },
     init = function()
       vim.g.bullets_outline_levels = { "ROM", "ABC", "rom", "abc", "num" }
       vim.g.bullets_set_mappings = 1

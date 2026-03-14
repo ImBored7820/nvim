@@ -2,10 +2,16 @@
 
 return {
   -- Fuzzy finder for notes: find files and grep content
+  -- cmd trigger ensures :Telescope find_files / live_grep work immediately without manual load
   {
     "nvim-telescope/telescope.nvim",
     version = "*",
-    dependencies = { "nvim-lua/plenary.nvim" },
+    dependencies = { 
+      "nvim-lua/plenary.nvim",
+      "nvim-telescope/telescope-project.nvim",
+      "nvim-telescope/telescope-file-browser.nvim"
+    },
+    cmd = "Telescope",
     keys = {
       { "<leader>ff", "<cmd>Telescope find_files<cr>", desc = "Find note files" },
       { "<leader>fg", "<cmd>Telescope live_grep<cr>", desc = "Grep note contents" },
