@@ -102,10 +102,27 @@ if (Ask-YesNo "Install Neovim?") {
 
 # ── 3. Optional: Install Neovide ──────────────────────────────
 
-if (Ask-YesNo "Install Neovide (Neovim GUI)?") {
-    Step "Installing Neovide via winget..."
-    winget install --id neovide.neovide -e --source winget --accept-source-agreements --accept-package-agreements
-    OK "Neovide installed."
+$installNeovide = Read-Host "Install Neovide? (y/n)"
+if ($installNeovide.Trim().ToUpper() -eq "Y") {
+    $scoopCmd = Get-Command scoop -ErrorAction SilentlyContinue
+    if (-not $scoopCmd) {
+        $installScoop = Read-Host "Scoop is not installed. Install Scoop permanently? (y/n)"
+        if ($installScoop.Trim().ToUpper() -ne "Y") {
+            Warn "Skipping Neovide installation."
+        } else {
+            Step "Installing Scoop..."
+            Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+            $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" +
+                        [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+            Step "Installing Neovide via Scoop..."
+            scoop install neovide
+            OK "Neovide installed."
+        }
+    } else {
+        Step "Installing Neovide via Scoop..."
+        scoop install neovide
+        OK "Neovide installed."
+    }
 } else {
     Warn "Skipping Neovide installation."
 }
