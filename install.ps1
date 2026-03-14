@@ -114,11 +114,15 @@ if ($installNeovide.Trim().ToUpper() -eq "Y") {
             Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
             $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" +
                         [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+            Step "Adding Scoop extras bucket..."
+            scoop bucket add extras
             Step "Installing Neovide via Scoop..."
             scoop install neovide
             OK "Neovide installed."
         }
     } else {
+        Step "Adding Scoop extras bucket..."
+        scoop bucket add extras
         Step "Installing Neovide via Scoop..."
         scoop install neovide
         OK "Neovide installed."
