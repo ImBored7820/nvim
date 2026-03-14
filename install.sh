@@ -3,8 +3,6 @@
 #  Usage: bash <(curl -fsSL https://raw.githubusercontent.com/ImBored7820/nvim/main/install.sh)
 # ============================================================
 
-set -e
-
 # ── Helpers ──────────────────────────────────────────────────
 
 # Detect whether the terminal supports Unicode. Falls back to ASCII-safe symbols
@@ -30,7 +28,7 @@ if command -v tput &>/dev/null && [[ -t 1 ]]; then
     C_GREEN="$(tput setaf 2)"
     C_YELLOW="$(tput setaf 3)"
     C_RED="$(tput setaf 1)"
-    C_DIM="$(tput dim 2>/dev/null || tput setaf 8 2>/dev/null || printf '\033[2m')"
+    C_DIM="$(tput setaf 8 2>/dev/null || printf '\033[2m')"
     C_RESET="$(tput sgr0)"
 else
     C_CYAN='\033[36m'
@@ -71,7 +69,7 @@ ask_yesno() {
         printf '  %b%s%b ' "$C_YELLOW" "$question" "$C_RESET"
         printf '%b[Y/N]: %b' "$C_DIM" "$C_RESET"
         read -r answer
-        answer="$(echo "${answer}" | tr '[:lower:]' '[:upper:]' | tr -d ' \t')"
+        answer="$(printf '%s' "${answer}" | tr '[:lower:]' '[:upper:]' | tr -d ' \t')"
         case "$answer" in
             Y) return 0 ;;
             N) return 1 ;;
@@ -117,13 +115,14 @@ macos_check_homebrew() {
         warn "Homebrew is not installed."
         if ask_yesno "Install Homebrew? (required for optional package installs)"; then
             step "Installing Homebrew..."
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || fail "Homebrew installation failed."
             # Add Homebrew to PATH for Apple Silicon and Intel
-            if [[ -f /opt/homebrew/bin/brew ]]; then
-                eval "$(/opt/homebrew/bin/brew shellenv)"
-            elif [[ -f /usr/local/bin/brew ]]; then
-                eval "$(/usr/local/bin/brew shellenv)"
-            fi
+            for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+                if [[ -x "$brew_path" ]]; then
+                    eval "$("$brew_path" shellenv)"
+                    break
+                fi
+            done
             ok "Homebrew installed."
         else
             fail "Homebrew is required to install git, Neovim, or Neovide. Please install it from https://brew.sh and re-run."
@@ -139,7 +138,7 @@ macos_check_git() {
         if command -v brew &>/dev/null; then
             if ask_yesno "Install git via Homebrew?"; then
                 step "Installing git via Homebrew..."
-                brew install git
+                brew install git || fail "git install failed."
                 ok "git installed successfully."
             else
                 fail "git is required to clone the config repo. Please install git and re-run."
@@ -155,7 +154,7 @@ macos_check_git() {
 macos_install_neovim() {
     if ask_yesno "Install Neovim?"; then
         step "Installing Neovim via Homebrew..."
-        brew install neovim
+        brew install neovim || fail "Neovim install failed."
         ok "Neovim installed."
         return 0
     fi
@@ -165,7 +164,7 @@ macos_install_neovim() {
 macos_install_neovide() {
     if ask_yesno "Install Neovide?"; then
         step "Installing Neovide via Homebrew..."
-        brew install neovide
+        brew install neovide || fail "Neovide install failed."
         ok "Neovide installed."
         return 0
     fi
@@ -174,6 +173,19 @@ macos_install_neovide() {
 }
 
 # ── Linux functions ───────────────────────────────────────────
+
+# Install Flatpak via the distro's package manager. Returns 0 on success, 1 on failure.
+linux_install_flatpak() {
+    local pm="$1"
+    case "$pm" in
+        apt)    sudo apt-get update -qq || return 1
+                sudo apt-get install -y flatpak || return 1 ;;
+        pacman) sudo pacman -S --noconfirm flatpak || return 1 ;;
+        dnf)    sudo dnf install -y flatpak || return 1 ;;
+        zypper) sudo zypper install -y flatpak || return 1 ;;
+        *)      return 1 ;;
+    esac
+}
 
 detect_pkg_manager() {
     if command -v apt-get &>/dev/null; then
@@ -196,16 +208,17 @@ linux_check_git() {
         pm="$(detect_pkg_manager)"
         case "$pm" in
             apt)    step "Installing git..."
-                    sudo apt-get update -qq && sudo apt-get install -y git
+                    sudo apt-get update -qq || fail "apt-get update failed."
+                    sudo apt-get install -y git || fail "git install failed."
                     ok "git installed." ;;
             pacman) step "Installing git..."
-                    sudo pacman -S --noconfirm git
+                    sudo pacman -S --noconfirm git || fail "git install failed."
                     ok "git installed." ;;
             dnf)    step "Installing git..."
-                    sudo dnf install -y git
+                    sudo dnf install -y git || fail "git install failed."
                     ok "git installed." ;;
             zypper) step "Installing git..."
-                    sudo zypper install -y git
+                    sudo zypper install -y git || fail "git install failed."
                     ok "git installed." ;;
             *)      fail "Could not detect a supported package manager. Please install git manually and re-run." ;;
         esac
@@ -224,25 +237,30 @@ linux_install_neovim() {
 
     case "$pm" in
         apt)
-            step "Adding Neovim PPA and installing Neovim..."
-            sudo add-apt-repository -y ppa:neovim-ppa/stable
-            sudo apt-get update -qq
-            sudo apt-get install -y neovim
+            if command -v add-apt-repository &>/dev/null; then
+                step "Adding Neovim PPA and installing Neovim..."
+                sudo add-apt-repository -y ppa:neovim-ppa/stable || fail "Failed to add Neovim PPA."
+            else
+                warn "add-apt-repository not available (non-Ubuntu distro). Installing Neovim from default repos — version may be older."
+                step "Installing Neovim..."
+            fi
+            sudo apt-get update -qq || fail "apt-get update failed."
+            sudo apt-get install -y neovim || fail "Neovim install failed."
             ok "Neovim installed."
             ;;
         pacman)
             step "Installing Neovim via pacman..."
-            sudo pacman -S --noconfirm neovim
+            sudo pacman -S --noconfirm neovim || fail "Neovim install failed."
             ok "Neovim installed."
             ;;
         dnf)
             step "Installing Neovim via dnf..."
-            sudo dnf install -y neovim
+            sudo dnf install -y neovim || fail "Neovim install failed."
             ok "Neovim installed."
             ;;
         zypper)
             step "Installing Neovim via zypper..."
-            sudo zypper install -y neovim
+            sudo zypper install -y neovim || fail "Neovim install failed."
             ok "Neovim installed."
             ;;
         *)
@@ -265,50 +283,18 @@ linux_install_neovide() {
         local pm
         pm="$(detect_pkg_manager)"
         case "$pm" in
-            apt)
+            apt|pacman|dnf|zypper)
                 if ask_yesno "Install Flatpak and Neovide?"; then
-                    sudo apt-get update -qq
-                    sudo apt-get install -y flatpak
-                    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+                    linux_install_flatpak "$pm" || { warn "Flatpak install failed."; return 1; }
+                    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || { warn "Failed to add Flathub remote."; return 1; }
                     step "Installing Neovide via Flatpak..."
-                    flatpak install -y flathub com.neovide.neovide && ok "Neovide installed." && return 0
-                    warn "Flatpak install failed." && return 1
-                else
-                    warn "Skipping Neovide installation."
-                    return 1
-                fi
-                ;;
-            pacman)
-                if ask_yesno "Install Flatpak and Neovide?"; then
-                    sudo pacman -S --noconfirm flatpak
-                    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-                    step "Installing Neovide via Flatpak..."
-                    flatpak install -y flathub com.neovide.neovide && ok "Neovide installed." && return 0
-                    warn "Flatpak install failed." && return 1
-                else
-                    warn "Skipping Neovide installation."
-                    return 1
-                fi
-                ;;
-            dnf)
-                if ask_yesno "Install Flatpak and Neovide?"; then
-                    sudo dnf install -y flatpak
-                    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-                    step "Installing Neovide via Flatpak..."
-                    flatpak install -y flathub com.neovide.neovide && ok "Neovide installed." && return 0
-                    warn "Flatpak install failed." && return 1
-                else
-                    warn "Skipping Neovide installation."
-                    return 1
-                fi
-                ;;
-            zypper)
-                if ask_yesno "Install Flatpak and Neovide?"; then
-                    sudo zypper install -y flatpak
-                    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-                    step "Installing Neovide via Flatpak..."
-                    flatpak install -y flathub com.neovide.neovide && ok "Neovide installed." && return 0
-                    warn "Flatpak install failed." && return 1
+                    if flatpak install -y flathub com.neovide.neovide; then
+                        ok "Neovide installed."
+                        return 0
+                    else
+                        warn "Flatpak install failed. You can try manually: flatpak install flathub com.neovide.neovide"
+                        return 1
+                    fi
                 else
                     warn "Skipping Neovide installation."
                     return 1
@@ -344,7 +330,7 @@ clone_config() {
         warn "A Neovim config directory already exists at: $config_dir"
         if ask_yesno "Back up existing config and replace it?"; then
             backup_dir="$(dirname "$config_dir")/nvim.backup_$(date +%Y%m%d_%H%M%S)"
-            mv "$config_dir" "$backup_dir"
+            mv "$config_dir" "$backup_dir" || fail "Failed to back up existing config."
             ok "Existing config backed up to: $backup_dir"
         else
             warn "Leaving existing config untouched. Skipping clone."
@@ -388,9 +374,9 @@ fi
 
 printf '\n'
 if [[ "$OS" == "macos" ]]; then
-    macos_install_neovim || true
+    macos_install_neovim
 else
-    linux_install_neovim || true
+    linux_install_neovim
 fi
 
 # ── 3. Optional: Neovide ──────────────────────────────────────
