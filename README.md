@@ -1,6 +1,6 @@
 # My notes app with neovim, made for neovide 
 
-## 1. Run this first (only needed once ever, not every time)
+## 1. Run this first (Optional, may not be needed)
 ```PowerShell
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
