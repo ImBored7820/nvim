@@ -1,4 +1,3 @@
-# ============================================================
 #  install.ps1 — Neovim config installer
 #  Usage: iwr -useb https://raw.githubusercontent.com/ImBored7820/nvim/main/install.ps1 | iex
 # ============================================================
@@ -7,20 +6,43 @@ $ErrorActionPreference = "Stop"
 
 # ── Helpers ──────────────────────────────────────────────────
 
+# Detect whether the current terminal supports Unicode output.
+# Falls back to ASCII-safe symbols if encoding is limited (e.g. older Windows
+# terminals, SSH sessions, or ConsoleHost without UTF-8 configured).
+function Get-SupportsUnicode {
+    $enc = [Console]::OutputEncoding
+    return ($enc.CodePage -eq 65001) -or ($enc.EncodingName -match "Unicode|UTF")
+}
+
+$unicode = Get-SupportsUnicode
+
+# Symbol set — chosen at startup based on terminal capability
+if ($unicode) {
+    $SYM_STEP = [char]0x25BA   # ►
+    $SYM_OK   = [char]0x2714   # ✔
+    $SYM_WARN = "[!]"          # no clean ASCII-width Unicode glyph; [!] is clear either way
+    $SYM_FAIL = [char]0x2716   # ✖
+} else {
+    $SYM_STEP = ">>"
+    $SYM_OK   = "[ok]"
+    $SYM_WARN = "[!]"
+    $SYM_FAIL = "[x]"
+}
+
+# Print the banner. Uses only plain ASCII characters so it renders correctly
+# on every terminal regardless of font or encoding.
 function Write-Header {
     Write-Host ""
-    Write-Host "  ███╗   ██╗██╗   ██╗██╗███╗   ███╗" -ForegroundColor Cyan
-    Write-Host "  ████╗  ██║██║   ██║██║████╗ ████║" -ForegroundColor Cyan
-    Write-Host "  ██╔██╗ ██║██║   ██║██║██╔████╔██║" -ForegroundColor Cyan
-    Write-Host "  ██║╚██╗██║╚██╗ ██╔╝██║██║╚██╔╝██║" -ForegroundColor Cyan
-    Write-Host "  ██║ ╚████║ ╚████╔╝ ██║██║ ╚═╝ ██║" -ForegroundColor Cyan
-    Write-Host "  ╚═╝  ╚═══╝  ╚═══╝  ╚═╝╚═╝     ╚═╝" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "  Config Installer by ImBored7820" -ForegroundColor DarkCyan
-    Write-Host "  ──────────────────────────────────" -ForegroundColor DarkGray
+    Write-Host "  +----------------------------------+" -ForegroundColor Cyan
+    Write-Host "  |                                  |" -ForegroundColor Cyan
+    Write-Host "  |   NVIM  Config Installer         |" -ForegroundColor Cyan
+    Write-Host "  |   by ImBored7820                 |" -ForegroundColor Cyan
+    Write-Host "  |                                  |" -ForegroundColor Cyan
+    Write-Host "  +----------------------------------+" -ForegroundColor Cyan
     Write-Host ""
 }
 
+# Prompt a yes/no question and return $true for Y, $false for N.
 function Ask-YesNo {
     param([string]$Question)
     while ($true) {
@@ -33,35 +55,41 @@ function Ask-YesNo {
     }
 }
 
+# Print a major action step (green).
 function Step {
     param([string]$Message)
     Write-Host ""
-    Write-Host "  ► $Message" -ForegroundColor Green
+    Write-Host "  $SYM_STEP $Message" -ForegroundColor Green
 }
 
+# Print a non-fatal warning (yellow).
 function Warn {
     param([string]$Message)
-    Write-Host "  ⚠  $Message" -ForegroundColor DarkYellow
+    Write-Host "  $SYM_WARN $Message" -ForegroundColor DarkYellow
 }
 
+# Print a fatal error, then exit.
 function Fail {
     param([string]$Message)
     Write-Host ""
-    Write-Host "  ✖ $Message" -ForegroundColor Red
+    Write-Host "  $SYM_FAIL $Message" -ForegroundColor Red
     Write-Host ""
     exit 1
 }
 
+# Print a success confirmation (cyan).
 function OK {
     param([string]$Message)
-    Write-Host "  ✔ $Message" -ForegroundColor Cyan
+    Write-Host "  $SYM_OK $Message" -ForegroundColor Cyan
 }
 
 # ── Entry point ───────────────────────────────────────────────
 
 Write-Header
 
-# ── 1. Check for winget ───────────────────────────────────────
+# ── 1. Check prerequisites (winget and git) ───────────────────
+# Winget is required for optional Neovim install and for git auto-install.
+# Git is required to clone the config repo.
 
 Step "Checking prerequisites..."
 
@@ -90,48 +118,82 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 
 # ── 2. Optional: Install Neovim ───────────────────────────────
+# The user may choose between Scoop (recommended) or winget.
+# If Scoop is chosen but not installed, we offer to install it first.
 
 Write-Host ""
 if (Ask-YesNo "Install Neovim?") {
-    Step "Installing Neovim via winget..."
-    winget install --id Neovim.Neovim -e --source winget --accept-source-agreements --accept-package-agreements
-    OK "Neovim installed."
-} else {
-    Warn "Skipping Neovim installation."
+
+    if (Ask-YesNo "Would you like to install Neovim through Scoop? (recommended)") {
+
+        # --- Scoop path ---
+        $scoopReady = $true
+        if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+            if (Ask-YesNo "Scoop is not installed. Install Scoop permanently?") {
+                Step "Installing Scoop..."
+                Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+                $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" +
+                            [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+            } else {
+                Warn "Scoop installation declined. Skipping Neovim installation."
+                $scoopReady = $false
+            }
+        }
+
+        if ($scoopReady) {
+            Step "Installing Neovim via Scoop..."
+            scoop install neovim
+            OK "Neovim installed via Scoop."
+        }
+
+    } else {
+
+        # --- winget path ---
+        Step "Installing Neovim via winget..."
+        winget install --id Neovim.Neovim -e --source winget --accept-source-agreements --accept-package-agreements
+        OK "Neovim installed via winget."
+
+    }
 }
 
 # ── 3. Optional: Install Neovide ──────────────────────────────
+# Neovide is only available through Scoop (extras bucket).
+# The extras bucket must be added before Neovide can be found by Scoop.
 
-$installNeovide = Read-Host "Install Neovide? (y/n)"
-if ($installNeovide.Trim().ToUpper() -eq "Y") {
-    $scoopCmd = Get-Command scoop -ErrorAction SilentlyContinue
-    if (-not $scoopCmd) {
-        $installScoop = Read-Host "Scoop is not installed. Install Scoop permanently? (y/n)"
-        if ($installScoop.Trim().ToUpper() -ne "Y") {
-            Warn "Skipping Neovide installation."
-        } else {
+Write-Host ""
+Write-Host "  NOTE: Neovide can only be installed through Scoop (via the extras bucket)." -ForegroundColor DarkGray
+Write-Host "        The extras bucket extends Scoop with community-maintained apps like Neovide." -ForegroundColor DarkGray
+Write-Host ""
+
+if (Ask-YesNo "Install Neovide? (Scoop only)") {
+
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+        if (Ask-YesNo "Scoop is not installed. Install Scoop permanently?") {
             Step "Installing Scoop..."
             Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
             $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" +
                         [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
-            Step "Adding Scoop extras bucket..."
-            scoop bucket add extras
-            Step "Installing Neovide via Scoop..."
-            scoop install neovide
-            OK "Neovide installed."
+        } else {
+            Warn "Scoop installation declined. Skipping Neovide installation."
         }
-    } else {
-        Step "Adding Scoop extras bucket..."
+    }
+
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        Step "Adding Scoop extras bucket (required for Neovide)..."
         scoop bucket add extras
         Step "Installing Neovide via Scoop..."
         scoop install neovide
         OK "Neovide installed."
+        $neovideInstalled = $true
     }
+
 } else {
     Warn "Skipping Neovide installation."
 }
 
-# ── 4. Clone config ───────────────────────────────────────────
+# ── 4. Clone the Neovim config ────────────────────────────────
+# Clones the config repo into %LOCALAPPDATA%\nvim.
+# If a config already exists there, the user is offered a timestamped backup.
 
 $configDir = Join-Path $env:LOCALAPPDATA "nvim"
 
@@ -155,7 +217,7 @@ if (Test-Path $configDir) {
 }
 
 # git writes clone progress to stderr; redirect it so $ErrorActionPreference = Stop
-# doesn't misinterpret it as a fatal PowerShell error
+# doesn't misinterpret it as a fatal PowerShell error.
 $gitOutput = & git clone https://github.com/ImBored7820/nvim.git $configDir 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host $gitOutput
@@ -165,12 +227,21 @@ if ($LASTEXITCODE -ne 0) {
 OK "Config cloned successfully."
 
 # ── 5. Done ───────────────────────────────────────────────────
+# Print a summary that reflects what was actually installed.
 
 Write-Host ""
-Write-Host "  ══════════════════════════════════════" -ForegroundColor DarkGray
-Write-Host "  ✔  All done! Happy editing." -ForegroundColor Cyan
+Write-Host "  ======================================" -ForegroundColor DarkGray
+Write-Host "  $SYM_OK  All done! Happy editing." -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Run 'nvim' or 'neovide' to get started." -ForegroundColor DarkCyan
+
+if ($neovideInstalled) {
+    Write-Host "  Run 'neovide' to launch Neovide (recommended GUI)," -ForegroundColor DarkCyan
+    Write-Host "  or 'nvim' to launch Neovim in the terminal." -ForegroundColor DarkCyan
+} else {
+    Write-Host "  Run 'nvim' to launch Neovim in the terminal." -ForegroundColor DarkCyan
+}
+
+Write-Host ""
 Write-Host "  Lazy.nvim will auto-install plugins on first launch." -ForegroundColor DarkGray
-Write-Host "  ══════════════════════════════════════" -ForegroundColor DarkGray
+Write-Host "  ======================================" -ForegroundColor DarkGray
 Write-Host ""
