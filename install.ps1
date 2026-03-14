@@ -85,6 +85,7 @@ function OK {
 
 # ── Entry point ───────────────────────────────────────────────
 
+$neovideInstalled = $false
 Write-Header
 
 # ── 1. Check prerequisites (winget and git) ───────────────────
