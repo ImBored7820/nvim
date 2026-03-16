@@ -377,6 +377,25 @@ clone_config() {
     fi
 }
 
+bootstrap_lazy() {
+    local data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+    local lazypath="$data_dir/lazy/lazy.nvim"
+
+    if [[ -d "$lazypath" ]]; then
+        ok "lazy.nvim already exists at: $lazypath"
+        return 0
+    fi
+
+    step "Bootstrapping lazy.nvim..."
+    mkdir -p "$data_dir" || fail "Failed to create data directory: $data_dir"
+
+    if git clone --filter=blob:none --branch=stable https://github.com/folke/lazy.nvim.git "$lazypath"; then
+        ok "lazy.nvim cloned successfully."
+    else
+        fail "Failed to clone lazy.nvim. Check your internet connection."
+    fi
+}
+
 # ── Entry point ───────────────────────────────────────────────
 
 neovide_installed=0
@@ -427,7 +446,11 @@ fi
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
 clone_config "$CONFIG_DIR"
 
-# ── 5. Done ───────────────────────────────────────────────────
+# ── 5. Bootstrap lazy.nvim ────────────────────────────────────
+
+bootstrap_lazy
+
+# ── 6. Done ───────────────────────────────────────────────────
 
 printf '\n'
 printf '  %b======================================%b\n' "$C_DIM" "$C_RESET"
@@ -442,6 +465,6 @@ else
 fi
 
 printf '\n'
-printf '  %bLazy.nvim will auto-install plugins on first launch.%b\n' "$C_DIM" "$C_RESET"
+printf '  %bLazy.nvim is pre-installed. Plugins will auto-install on first launch.%b\n' "$C_DIM" "$C_RESET"
 printf '  %b======================================%b\n' "$C_DIM" "$C_RESET"
 printf '\n'
