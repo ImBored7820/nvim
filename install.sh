@@ -164,7 +164,7 @@ macos_install_neovim() {
 macos_install_neovide() {
     if ask_yesno "Install Neovide?"; then
         step "Installing Neovide via Homebrew..."
-        brew install neovide || fail "Neovide install failed."
+        brew install --cask neovide || fail "Neovide install failed."
         ok "Neovide installed."
         return 0
     fi
@@ -174,18 +174,6 @@ macos_install_neovide() {
 
 # ── Linux functions ───────────────────────────────────────────
 
-# Install Flatpak via the distro's package manager. Returns 0 on success, 1 on failure.
-linux_install_flatpak() {
-    local pm="$1"
-    case "$pm" in
-        apt)    sudo apt-get update -qq || return 1
-                sudo apt-get install -y flatpak || return 1 ;;
-        pacman) sudo pacman -S --noconfirm flatpak || return 1 ;;
-        dnf)    sudo dnf install -y flatpak || return 1 ;;
-        zypper) sudo zypper install -y flatpak || return 1 ;;
-        *)      return 1 ;;
-    esac
-}
 
 detect_pkg_manager() {
     if command -v apt-get &>/dev/null; then
@@ -278,43 +266,82 @@ linux_install_neovide() {
         return 1
     fi
 
-    if ! command -v flatpak &>/dev/null; then
-        warn "Flatpak is not installed. Neovide is best installed via Flatpak on Linux."
-        local pm
-        pm="$(detect_pkg_manager)"
-        case "$pm" in
-            apt|pacman|dnf|zypper)
-                if ask_yesno "Install Flatpak and Neovide?"; then
-                    linux_install_flatpak "$pm" || { warn "Flatpak install failed."; return 1; }
-                    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || { warn "Failed to add Flathub remote."; return 1; }
-                    step "Installing Neovide via Flatpak..."
-                    if flatpak install -y flathub com.neovide.neovide; then
-                        ok "Neovide installed."
-                        return 0
-                    else
-                        warn "Flatpak install failed. You can try manually: flatpak install flathub com.neovide.neovide"
-                        return 1
-                    fi
+    local pm
+    pm="$(detect_pkg_manager)"
+
+    case "$pm" in
+        pacman)
+            step "Installing Neovide via pacman..."
+            sudo pacman -S --noconfirm neovide || fail "Neovide install failed."
+            if ask_yesno "Install libxkbcommon-x11 for X11 support?"; then
+                sudo pacman -S --noconfirm libxkbcommon-x11 || warn "libxkbcommon-x11 install failed."
+            fi
+            ok "Neovide installed."
+            return 0
+            ;;
+        *)
+            if command -v nix &>/dev/null; then
+                warn "Nix detected. For Nix, run: nix-shell -p neovide"
+                warn "For NixOS, add neovide to environment.systemPackages in configuration.nix"
+                if ask_yesno "Try nix-shell -p neovide to install temporarily?"; then
+                    step "Running nix-shell -p neovide..."
+                    nix-shell -p neovide --run "echo 'Neovide available in this shell'" || warn "nix-shell failed."
+                    ok "Neovide available via nix-shell."
+                    return 0
+                else
+                    return 1
+                fi
+            else
+                if ask_yesno "Build Neovide from source?"; then
+                    linux_build_neovide "$pm"
+                    return $?
                 else
                     warn "Skipping Neovide installation."
                     return 1
                 fi
-                ;;
-            *)
-                warn "Neovide requires Flatpak. Install Flatpak for your distro, then run: flatpak install flathub com.neovide.neovide"
-                return 1
-                ;;
-        esac
-    else
-        step "Installing Neovide via Flatpak..."
-        if flatpak install -y flathub com.neovide.neovide; then
-            ok "Neovide installed."
-            return 0
-        else
-            warn "Flatpak install failed. You can try manually: flatpak install flathub com.neovide.neovide"
-            return 1
-        fi
+            fi
+            ;;
+    esac
+}
+
+linux_build_neovide() {
+    local pm="$1"
+
+    # Check rust
+    if ! command -v cargo &>/dev/null; then
+        step "Installing Rust..."
+        curl --proto '=https' --tlsv1.2 -sSf "https://sh.rustup.rs" | sh -s -- -y || fail "Rust install failed."
+        export PATH="$HOME/.cargo/bin:$PATH"
+        ok "Rust installed."
     fi
+
+    # Install deps
+    case "$pm" in
+        apt)
+            step "Installing dependencies for Ubuntu/Debian..."
+            sudo apt-get update -qq || fail "apt update failed."
+            sudo apt-get install -y curl gnupg ca-certificates git gcc-multilib g++-multilib cmake libssl-dev pkg-config libfreetype6-dev libasound2-dev libexpat1-dev libxcb-composite0-dev libbz2-dev libsndio-dev freeglut3-dev libxmu-dev libxi-dev libfontconfig1-dev libxcursor-dev || fail "Dependencies install failed."
+            ;;
+        dnf)
+            step "Installing dependencies for Fedora..."
+            sudo dnf install -y fontconfig-devel freetype-devel @development-tools libstdc++-static libstdc++-devel || fail "Dependencies install failed."
+            ;;
+        zypper)
+            step "Installing dependencies for openSUSE..."
+            sudo zypper install -y fontconfig-devel freetype-devel gcc-c++ cmake libopenssl-devel pkgconfig || fail "Dependencies install failed."
+            ;;
+        *)
+            warn "Unknown package manager. Please install dependencies manually: gcc, cmake, freetype, fontconfig, etc."
+            if ! ask_yesno "Continue anyway?"; then
+                return 1
+            fi
+            ;;
+    esac
+
+    step "Building Neovide from source..."
+    cargo install --git https://github.com/neovide/neovide || fail "Neovide build failed."
+    ok "Neovide built and installed."
+    return 0
 }
 
 # ── Clone config (shared) ─────────────────────────────────────
@@ -382,11 +409,6 @@ fi
 # ── 3. Optional: Neovide ──────────────────────────────────────
 
 printf '\n'
-if [[ "$OS" == "linux" ]]; then
-    printf '  %bNOTE: Neovide on Linux is installed via Flatpak (universal).%b\n' "$C_DIM" "$C_RESET"
-    printf '  %b      Flatpak will be installed if needed.%b\n' "$C_DIM" "$C_RESET"
-    printf '\n'
-fi
 
 if [[ "$OS" == "macos" ]]; then
     if macos_install_neovide; then
