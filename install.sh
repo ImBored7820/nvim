@@ -123,6 +123,8 @@ macos_check_homebrew() {
                     break
                 fi
             done
+            step "Configuring PATH for GUI applications..."
+            sudo launchctl config user path "$(brew --prefix)/bin:${PATH}" || warn "Failed to configure PATH for GUI apps."
             ok "Homebrew installed."
         else
             fail "Homebrew is required to install git, Neovim, or Neovide. Please install it from https://brew.sh and re-run."
