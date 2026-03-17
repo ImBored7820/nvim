@@ -378,7 +378,12 @@ clone_config() {
 }
 
 bootstrap_lazy() {
-    local data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+    local data_dir
+    if [[ "$OS" == "macos" ]]; then
+        data_dir="$HOME/Library/Application Support/nvim"
+    else
+        data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+    fi
     local lazypath="$data_dir/lazy/lazy.nvim"
 
     if [[ -d "$lazypath" ]]; then
@@ -387,7 +392,7 @@ bootstrap_lazy() {
     fi
 
     step "Bootstrapping lazy.nvim..."
-    mkdir -p "$data_dir" || fail "Failed to create data directory: $data_dir"
+    mkdir -p "$(dirname "$lazypath")" || fail "Failed to create data directory: $(dirname "$lazypath")"
 
     if git clone --filter=blob:none --branch=stable https://github.com/folke/lazy.nvim.git "$lazypath"; then
         ok "lazy.nvim cloned successfully."
