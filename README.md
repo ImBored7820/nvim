@@ -20,11 +20,5 @@
 bash <(curl -fsSL https://raw.githubusercontent.com/ImBored7820/nvim/main/install.sh)
 ```
 
-The installer will:
-- Check for prerequisites (Homebrew on macOS; git on both)
-- Optionally install Neovim (Homebrew on macOS; apt/pacman/dnf/zypper or PPA on Linux)
-- Optionally install Neovide (Homebrew on macOS; Flatpak on Linux)
-- Clone this config to `~/.config/nvim` (or `%LOCALAPPDATA%\nvim` on Windows)
-- Create a timestamped backup if a config already exists
-
 Lazy.nvim will auto-install plugins on first launch.
+
