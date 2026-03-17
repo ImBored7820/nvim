@@ -46,5 +46,8 @@ require("lazy").setup({
     colorscheme = { "catppuccin-macchiato" },
   },
   checker = { enabled = true },
+  git = {
+    filter = false,
+  },
 })
 
