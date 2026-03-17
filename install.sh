@@ -394,7 +394,7 @@ bootstrap_lazy() {
     step "Bootstrapping lazy.nvim..."
     mkdir -p "$(dirname "$lazypath")" || fail "Failed to create data directory: $(dirname "$lazypath")"
 
-    if git clone --filter=blob:none --branch=stable https://github.com/folke/lazy.nvim.git "$lazypath"; then
+    if git clone --branch=stable https://github.com/folke/lazy.nvim.git "$lazypath"; then
         ok "lazy.nvim cloned successfully."
     else
         fail "Failed to clone lazy.nvim. Check your internet connection."
