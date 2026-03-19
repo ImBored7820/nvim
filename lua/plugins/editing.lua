@@ -110,7 +110,7 @@ return {
   -- ft trigger loads only for .md, .txt, gitcommit (autocmds set filetype for *.txt)
   {
     "dkarter/bullets.vim",
-    ft = { "markdown", "text" },
+    ft = { "markdown", "text", "gitcommit" },
     init = function()
       vim.g.bullets_outline_levels = { "ROM", "ABC", "rom", "abc", "num" }
       vim.g.bullets_set_mappings = 1

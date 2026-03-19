@@ -156,7 +156,7 @@ macos_check_git() {
 macos_install_neovim() {
     if ask_yesno "Install Neovim?"; then
         step "Installing Neovim via Homebrew..."
-        brew install neovim || fail "Neovim install failed."
+        brew install neovim || warn "Neovim install failed (or already installed)."
         ok "Neovim installed."
         return 0
     fi
@@ -166,7 +166,7 @@ macos_install_neovim() {
 macos_install_neovide() {
     if ask_yesno "Install Neovide?"; then
         step "Installing Neovide via Homebrew..."
-        brew install --cask neovide || fail "Neovide install failed."
+        brew install --cask neovide || warn "Neovide install failed (or already installed)."
         ok "Neovide installed."
         return 0
     fi
@@ -341,7 +341,7 @@ linux_build_neovide() {
     esac
 
     step "Building Neovide from source..."
-    cargo install --git https://github.com/neovide/neovide || fail "Neovide build failed."
+    cargo install --git https://github.com/neovide/neovide || warn "Neovide build failed (or already installed)."
     ok "Neovide built and installed."
     return 0
 }

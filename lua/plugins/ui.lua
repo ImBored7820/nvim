@@ -72,7 +72,7 @@ return {
 
       return {
         options = {
-          theme = "catppuccin-macchiato",
+          theme = "catppuccin",
           component_separators = { left = "|", right = "|" },
           section_separators = { left = "", right = "" },
           globalstatus = true,

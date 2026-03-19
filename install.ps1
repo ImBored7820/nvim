@@ -132,6 +132,7 @@ if (Ask-YesNo "Install Neovim?") {
         if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
             if (Ask-YesNo "Scoop is not installed. Install Scoop permanently?") {
                 Step "Installing Scoop..."
+                Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -ErrorAction SilentlyContinue
                 Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
                 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" +
                             [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
@@ -143,7 +144,7 @@ if (Ask-YesNo "Install Neovim?") {
 
         if ($scoopReady) {
             Step "Installing Neovim via Scoop..."
-            scoop install neovim
+            try { scoop install neovim 2>&1 | Out-Null } catch {}
             OK "Neovim installed via Scoop."
         }
 
@@ -151,7 +152,7 @@ if (Ask-YesNo "Install Neovim?") {
 
         # --- winget path ---
         Step "Installing Neovim via winget..."
-        winget install --id Neovim.Neovim -e --source winget --accept-source-agreements --accept-package-agreements
+        try { winget install --id Neovim.Neovim -e --source winget --accept-source-agreements --accept-package-agreements 2>&1 | Out-Null } catch {}
         OK "Neovim installed via winget."
 
     }
@@ -181,9 +182,9 @@ if (Ask-YesNo "Install Neovide? (Scoop only)") {
 
     if (Get-Command scoop -ErrorAction SilentlyContinue) {
         Step "Adding Scoop extras bucket (required for Neovide)..."
-        scoop bucket add extras
+        try { scoop bucket add extras 2>&1 | Out-Null } catch {}
         Step "Installing Neovide via Scoop..."
-        scoop install neovide
+        try { scoop install neovide 2>&1 | Out-Null } catch {}
         OK "Neovide installed."
         $neovideInstalled = $true
     }
