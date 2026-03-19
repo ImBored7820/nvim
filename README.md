@@ -50,3 +50,4 @@ The installer will:
 - Create a timestamped backup if a config already exists.
 
 Lazy.nvim will auto-install plugins on first launch.
+
